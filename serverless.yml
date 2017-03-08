@@ -1,0 +1,82 @@
+service: lawos-serverless
+
+provider:
+  name: aws
+  runtime: nodejs4.3
+  region: eu-west-1
+  stage: dev
+  memorySize: 128
+  timeout: 20
+
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  sns: ${self:custom.stage}-lawos-serverless-trigger
+  sqs: ${self:custom.stage}-lawos-serverless-backlog
+
+package:
+  exclude:
+    - node_modules/**
+
+functions:
+  worker:
+    handler: functions/worker.handler
+    name: ${self:custom.stage}-lawos-serverless-worker
+    environment:
+      sqs: ${self:custom.sqs}
+    events:
+      - schedule: rate(1 minute)
+      - sns: ${self:custom.sns}
+
+resources:
+  Resources:
+    BacklogQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.sqs}
+        MessageRetentionPeriod: '1209600'
+        VisibilityTimeout: '60'
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+            - DeadLetterQueue
+            - Arn
+          maxReceiveCount: '10'
+
+    DeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.sqs}-dead-letter-queue
+        MessageRetentionPeriod: '1209600'
+
+    QueueDepthAlarmOver100:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmDescription: Alarm if queue depth grows beyond 100 messages
+        Namespace: AWS/SQS
+        MetricName: NumberOfMessagesVisible
+        Dimensions:
+        - Name: QueueName
+          Value: ${self:custom.sqs}
+        Statistic: Sum
+        Period: '60'
+        EvaluationPeriods: '1'
+        Threshold: '100'
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        AlarmActions:
+        - { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:custom.sns}" ] ]  }
+
+    SQSIamPolicy:
+      Type: AWS::IAM::Policy
+      DependsOn: BacklogQueue
+      Properties:
+        PolicyName: lambda-sqs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - sqs:DeleteMessage
+                - sqs:ReceiveMessage
+              Resource: arn:aws:sqs:*:*:${self:custom.sqs}
+        Roles:
+          - Ref: IamRoleLambdaExecution

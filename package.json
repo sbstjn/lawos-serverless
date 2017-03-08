@@ -1,0 +1,31 @@
+{
+  "name": "lawos-serverless",
+  "version": "1.0.0",
+  "description": "Example Lawos SQS Worker for AWS Lambda with Serverless",
+  "main": "index.js",
+  "homepage": "https://github.com/sbstjn/lawos-serverless",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sbstjn/lawos-serverless.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "cd functions && npm install",
+    "deploy": "./node_modules/.bin/serverless deploy",
+    "invoke": "./node_modules/.bin/serverless invoke -f worker",
+    "invoke:logs": "./node_modules/.bin/serverless invoke -f worker --log"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "sqs",
+    "worker",
+    "serverless",
+    "lawos"
+  ],
+  "author": "Sebastian Müller <mail@sbstjn.com>",
+  "license": "MIT",
+  "dependencies": {
+    "serverless": "^1.8.0"
+  }
+}
