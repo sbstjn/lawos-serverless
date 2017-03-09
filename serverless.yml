@@ -7,6 +7,17 @@ provider:
   stage: dev
   memorySize: 128
   timeout: 20
+  iamRoleStatements:
+  - Effect: "Allow"
+    Action:
+      - "lambda:InvokeFunction"
+    Resource:
+      - "*"
+  - Effect: Allow
+    Action:
+      - sqs:DeleteMessage
+      - sqs:ReceiveMessage
+    Resource: arn:aws:sqs:*:*:${self:custom.sqs}
 
 custom:
   stage: ${opt:stage, self:provider.stage}
@@ -18,11 +29,16 @@ package:
     - node_modules/**
 
 functions:
+  task:
+    handler: functions/task.handler
+    name: ${self:custom.stage}-lawos-serverless-task
+
   worker:
     handler: functions/worker.handler
     name: ${self:custom.stage}-lawos-serverless-worker
     environment:
       sqs: ${self:custom.sqs}
+      lambda: ${self:custom.stage}-lawos-serverless-task
     events:
       - schedule: rate(1 minute)
       - sns: ${self:custom.sns}
@@ -64,19 +80,3 @@ resources:
         ComparisonOperator: GreaterThanOrEqualToThreshold
         AlarmActions:
         - { "Fn::Join" : ["", ["arn:aws:sns:${self:provider.region}:", { "Ref" : "AWS::AccountId" }, ":${self:custom.sns}" ] ]  }
-
-    SQSIamPolicy:
-      Type: AWS::IAM::Policy
-      DependsOn: BacklogQueue
-      Properties:
-        PolicyName: lambda-sqs
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - sqs:DeleteMessage
-                - sqs:ReceiveMessage
-              Resource: arn:aws:sqs:*:*:${self:custom.sqs}
-        Roles:
-          - Ref: IamRoleLambdaExecution
