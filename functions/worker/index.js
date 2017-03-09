@@ -14,13 +14,9 @@ module.exports.handler = (event, context, callback) => {
     })
   );
 
-  Q.work(() => {
-    if (context.getRemainingTimeInMillis() > 1000) {
-      return Promise.resolve();
-    } else {
-      return Promise.reject();
-    }
-  }).then(
+  Q.work(
+    () => Promise.resolve(context.getRemainingTimeInMillis() < 1000)
+  ).then(
     data => {
       console.log(data);
 
